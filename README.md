@@ -1,0 +1,130 @@
+# Artifact
+
+A PI WEB tab that renders an agent-written page in the workspace, lets you annotate elements and selected
+text, and hands the comments to the conversation as a single message. It ships with the Pi skill that writes
+those pages.
+
+```
+Agent writes test-results/artifact/<session>/<topic>/artifact.html
+        │
+        ▼
+Artifact tab renders it in a sandbox, on the page's own design tokens
+        │  you click an element or select text, write a comment
+        ▼
+Send to chat stages one chip → the agent reads the comments and revises the page
+```
+
+## Install
+
+Two registrations, because the two runtimes look in different places. Neither needs a service restart.
+
+```bash
+# 1. PI WEB: the tab. Clone anywhere, then link it into the local plugin directory.
+git clone https://github.com/ivolejon/pi-web-artifact.git
+ln -sfn "$(pwd)/pi-web-artifact" ~/.pi-web/plugins/artifact
+
+# 2. Pi: the /skill:artifact command.
+pi install -l git:github.com/ivolejon/pi-web-artifact   # or a local path: pi install -l ./pi-web-artifact
+```
+
+Reload the browser page for the tab. Pi reads the package declaration after project trust, and a running
+session needs `/reload` to pick the skill up. On a machine where `PI_WEB_DATA_DIR` is set, link into
+`$PI_WEB_DATA_DIR/plugins` instead.
+
+Check both:
+
+```bash
+curl -s http://127.0.0.1:8504/api/plugins | grep -o '"id":"artifact"[^}]*'   # the tab
+pi list | grep artifact                                                      # the skill
+```
+
+To remove the tab, delete the symlink and reload the browser; Settings → PI WEB plugins can also disable it
+without removing the package. To remove the skill, `pi remove -l <source>`.
+
+## What it does
+
+- **Binds to the open conversation.** It shows every `.html` file under
+  `test-results/artifact/<session id>/` in the selected workspace as a tab, newest first, and shows nothing
+  when no conversation is selected. The session segment is what keeps two conversations in one workspace
+  apart.
+- **Exposes one page at a time, per tab.** One strip, one tab per page, the topic name when it is unique and
+  the file name when one topic holds several pages. Arrow keys, Home and End move between tabs, and a strip
+  that scrolls fades at the edge that continues.
+- **Renders in a sandbox.** An `iframe` with `sandbox="allow-scripts"` and no `allow-same-origin`, so the page
+  runs at an opaque origin: it cannot read the host, its cookies or its DOM. A `Content-Security-Policy`
+  blocks every network request. Relative stylesheets are read through the file API and inlined; local images
+  are resolved through the host's preview URL, which is the only permitted network origin.
+- **Follows the file.** A write from outside the app, such as the agent saving from a terminal, does not
+  always raise a host invalidation, so the panel also compares the artifact's modification time every two
+  seconds while the tab is visible. A changed file is re-read, and the user's comments, open comment field
+  and scroll position are kept.
+- **Opens itself.** When a new page appears for the open conversation, the tab selects itself within a couple
+  of seconds, so the skill writes the page and says nothing. A revision of an existing page never steals the
+  tab back, and loading the app never moves it.
+- **Collects comments.** **Annotate** is one toggle: on, a click on an element or a text selection opens a
+  comment field naming the target and its CSS selector; off, clicks stay inside the page as the page intends.
+  Press **Enter** to add the comment. **Show** scrolls the artifact back to it, **Remove** deletes it.
+  Comments are kept in `sessionStorage` per conversation and page, because the host unmounts the panel
+  whenever another tab is selected.
+- **Sends to the chat.** **Send to chat** stages the comments as a chip in the message box (`setChip`), or
+  writes them into the box when the host has no chip support. You press **Send**; the plugin never posts a
+  message on its own.
+- **Deep links.** The panel stores the selected page in the tab's query, and a chat or Files link to a file
+  under the open conversation's directory opens in this tab. A link to another conversation's artifact opens
+  in Files instead.
+
+## The skill
+
+`skills/artifact` teaches the agent to build the page: what form to choose, how to take the colours and type
+from the repository under review instead of inventing them, and what the comments come back as.
+
+- `scripts/design-tokens.mjs` discovers the project's stylesheet, copies its custom properties and its local
+  font files into `<run>/tokens.css`, and maps them onto the semantic names the structure sheet reads.
+  Exit code 3 means it found no design source, and the neutral defaults carry the page.
+- `assets/artifact.css` is the structure sheet: layout, cards, pills, tables, diffs, diagrams. It names no
+  product colour.
+- `assets/artifact-template.html` is the page skeleton to copy.
+
+## Files
+
+| File | Role |
+| --- | --- |
+| `package.json` | the `piWeb.plugins` entry that PI WEB discovers |
+| `pi-web-plugin.js` | contributions: the Artifact tab, its action, file-open routing |
+| `review-panel.js` | the panel element: discovery, rendering, comments, chip staging |
+| `compose.js` | builds the sandboxed document, inlines local assets, injects the annotation script |
+| `auto-open.js` | selects the tab when a new page appears for the open conversation |
+| `skills/artifact/` | the skill, its structure sheet, template and design-token script |
+
+## Two host contracts, not APIs
+
+`auto-open.js` relies on two things that the plugin API does not promise, and both are commented where they
+are used. Check them after a PI WEB upgrade:
+
+1. A workspace label renders in every workspace view, so its callback is where the plugin captures its
+   context. That context's file handle can point at another workspace, so the listing uses the host's
+   `api/machines/<machine>/projects/<project>/workspaces/<workspace>/tree` route with the ids from the URL.
+2. There is no API for selecting a tool from a closed panel, so the switch rewrites the `tool` and `view`
+   URL parameters and dispatches `popstate`.
+
+If either contract changes, the tab stops opening by itself. The panel and the comments keep working, and the
+page stays one click away.
+
+## Requirements
+
+PI WEB with browser API v5 and the `stylesheet-integration` v1 capability (verified on 1.202610.7). The plugin
+declares that capability as required, so an older host skips it instead of rendering it unstyled. The skill
+needs Node.js 18 or later for its token script and nothing else: no build step, no dependencies.
+
+## Verify a change
+
+1. Reload the browser, open a conversation that has an artifact under
+   `test-results/artifact/<that session id>/`, and open the Artifact tab.
+2. Confirm the page renders with the project's own colours and fonts and no console errors, and that it fills
+   the panel; narrow the window until the comments column moves below the frame.
+3. Click a heading and a paragraph: both comments must name a selector, and the text comment must quote the
+   selection.
+4. Press **Send to chat** and confirm the chip appears in the message box. Do not press Send unless the
+   conversation you are testing in should receive the comments.
+5. Select another conversation and confirm the tab shows that conversation's state, with the previous
+   conversation's comments gone. Select none and confirm the notice.

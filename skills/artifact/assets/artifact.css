@@ -1,0 +1,395 @@
+/*
+ * Structure sheet for review artifacts.
+ *
+ * It reads the page's colours, type and radii through a fixed set of semantic names, and falls back to a
+ * neutral value for each one, so a page without a generated `tokens.css` still renders. `tokens.css` is
+ * written per run by `scripts/design-tokens.mjs`, which copies the palette of the repository the artifact
+ * describes. That is why nothing here names a product colour.
+ *
+ * `tokens.css` loads before this sheet, so this one must never declare a semantic name itself: it would
+ * override the project's value. The fallbacks below are separate names that the rules read through
+ * `var(--name, var(--fallback))`, which keeps a generated palette in charge whenever there is one.
+ */
+
+:root {
+  /* A raised surface derived from the page and the text, so an unmapped palette still reads on light and
+   * dark pages alike. */
+  --surface-default: color-mix(in srgb, var(--page, #f7f6f2) 92%, var(--ink, #1b1b1f));
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--page, #f7f6f2);
+  color: var(--ink, #1b1b1f);
+  font-family: var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent, #2f6feb);
+  outline-offset: 2px;
+}
+
+/* The page frame: one centred column, generous side padding, never a full-bleed paragraph. */
+.page {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 48px 32px 72px;
+}
+@media (max-width: 700px) {
+  .page {
+    padding: 28px 18px 48px;
+  }
+}
+
+/* Type roles. Sized for a page read at a desk, then for a phone. */
+.eyebrow {
+  margin: 0 0 8px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.45;
+  text-transform: uppercase;
+  color: var(--muted, #7a7a86);
+}
+h1 {
+  margin: 0;
+  font-size: 36px;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  font-weight: 300;
+}
+@media (max-width: 700px) {
+  h1 {
+    font-size: 30px;
+  }
+}
+.lede {
+  max-width: 68ch;
+  margin: 12px 0 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink-2, #4c4c55);
+}
+h2 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 400;
+}
+h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  line-height: 1.45;
+  font-weight: 400;
+}
+p {
+  margin: 0 0 12px;
+  max-width: 72ch;
+}
+.meta {
+  font-size: 13px;
+  color: var(--muted, #7a7a86);
+}
+.caption {
+  font-size: 12px;
+  color: var(--muted, #7a7a86);
+}
+.strong {
+  font-weight: 600;
+}
+.mono,
+.num {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A long path, identifier or mono label wraps instead of pushing its card sideways. */
+p,
+h1,
+h2,
+h3,
+li,
+dt,
+dd,
+blockquote,
+figcaption,
+td,
+th {
+  overflow-wrap: anywhere;
+}
+img,
+video,
+canvas,
+iframe {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Sections stack on the 8-pt grid: 32 between chapters, 16 inside them. */
+section {
+  margin-top: 32px;
+}
+.stack {
+  display: grid;
+  gap: 16px;
+}
+.grid-2 {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.grid-3 {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 860px) {
+  .grid-2,
+  .grid-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Cards: the card surface, radius 12, no shadow. The page colour does the separating. */
+.card {
+  min-width: 0;
+  border-radius: var(--radius, 12px);
+  background: var(--card, var(--surface-default));
+  padding: 24px;
+}
+.card--muted {
+  background: color-mix(in srgb, var(--card, var(--surface-default)) 55%, var(--page, #f7f6f2));
+}
+.card--turn {
+  background: var(--card, var(--surface-default));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent, #2f6feb) 35%, transparent);
+}
+.card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: -24px -24px 20px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--line, #e6e3da);
+}
+.card-head h2,
+.card-head h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.45;
+}
+.card-head .spacer {
+  flex: 1 1 auto;
+}
+
+/* Pills: 12px label, 8 by 2 padding, fully round. Tones come from the palette, not from fixed hex. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--card, var(--surface-default)) 60%, var(--page, #f7f6f2));
+  color: var(--ink-2, #4c4c55);
+}
+.pill--good {
+  background: color-mix(in srgb, var(--positive, #2f6b3a) 16%, var(--card, var(--surface-default)));
+  color: var(--positive, #2f6b3a);
+}
+.pill--warn {
+  background: color-mix(in srgb, var(--accent, #2f6feb) 14%, var(--card, var(--surface-default)));
+  color: var(--accent, #2f6feb);
+}
+
+/* Buttons: mono 12px, fully round, 44px on phones and 40px above that. */
+.btn {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 20px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.45;
+  text-decoration: none;
+  cursor: pointer;
+  background: var(--ink, #1b1b1f);
+  color: var(--page, #f7f6f2);
+}
+.btn--secondary {
+  background: var(--card, var(--surface-default));
+  color: var(--ink, #1b1b1f);
+  box-shadow: inset 0 0 0 1px var(--line, #e6e3da);
+}
+.btn--turn {
+  background: var(--accent, #2f6feb);
+  color: var(--accent-ink, var(--page, #f7f6f2));
+}
+@media (min-width: 700px) {
+  .btn {
+    min-height: 40px;
+  }
+}
+
+/* Tables wrap inside .table-wrap; the wrapper still scrolls, so one unbreakable identifier cannot
+ * push the page sideways. Keep a table to three or four columns so it stays readable on a phone. */
+.table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line, #e6e3da) transparent;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+th,
+td {
+  border-bottom: 1px solid var(--line, #e6e3da);
+  padding: 12px 14px;
+  vertical-align: top;
+}
+thead th {
+  color: var(--muted, #7a7a86);
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+tbody th {
+  font-weight: 400;
+}
+tbody tr:last-child th,
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+th.num,
+td.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Code and diffs. One quiet surface, mono 12.5px, and a tinted lane for the changed lines. */
+pre {
+  overflow-x: auto;
+  margin: 0;
+  border-radius: var(--radius-field, 10px);
+  background: color-mix(in srgb, var(--card, var(--surface-default)) 55%, var(--page, #f7f6f2));
+  padding: 16px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink, #1b1b1f);
+  tab-size: 2;
+}
+pre .add {
+  display: block;
+  background: color-mix(in srgb, var(--positive, #2f6b3a) 14%, transparent);
+  color: var(--positive, #2f6b3a);
+}
+pre .del {
+  display: block;
+  background: color-mix(in srgb, var(--negative, #a3352a) 14%, transparent);
+  color: var(--negative, #a3352a);
+}
+pre .ctx {
+  display: block;
+  color: var(--ink-2, #4c4c55);
+}
+code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12.5px;
+}
+
+/* A callout for the one thing the reader must not miss. */
+.note {
+  border-radius: var(--radius, 12px);
+  background: color-mix(in srgb, var(--accent, #2f6feb) 9%, var(--card, var(--surface-default)));
+  padding: 16px 20px;
+}
+.note p:last-child {
+  margin-bottom: 0;
+}
+
+/* Diagrams are inline SVG: strokes 1.5, labels 12px sans, one accent for the step that matters. */
+svg {
+  display: block;
+  width: 100%;
+  min-width: 480px;
+  height: auto;
+}
+.diagram {
+  overflow-x: auto;
+  border-radius: var(--radius, 12px);
+  background: var(--card, var(--surface-default));
+  padding: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line, #e6e3da) transparent;
+}
+.diagram text {
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12px;
+  fill: var(--ink-2, #4c4c55);
+}
+.diagram .label-strong {
+  fill: var(--ink, #1b1b1f);
+  font-weight: 600;
+}
+.diagram .stroke {
+  fill: none;
+  stroke: var(--ink-2, #4c4c55);
+  stroke-width: 1.5;
+}
+.diagram .fill-quiet {
+  fill: var(--card, var(--surface-default));
+  stroke: color-mix(in srgb, var(--ink, #1b1b1f) 25%, transparent);
+  stroke-width: 1.5;
+}
+.diagram .fill-accent {
+  fill: color-mix(in srgb, var(--accent, #2f6feb) 14%, var(--card, var(--surface-default)));
+  stroke: var(--accent, #2f6feb);
+  stroke-width: 1.5;
+}
+.diagram .fill-good {
+  fill: color-mix(in srgb, var(--positive, #2f6b3a) 14%, var(--card, var(--surface-default)));
+  stroke: var(--positive, #2f6b3a);
+  stroke-width: 1.5;
+}
+
+/* Entrance only, and dropped entirely for a reader who asked for less motion. */
+.rise {
+  animation: rise 220ms ease-out both;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
+}

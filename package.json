@@ -1,0 +1,20 @@
+{
+  "name": "pi-web-artifact",
+  "version": "0.1.0",
+  "description": "A PI WEB tab that renders an agent-written page from the workspace in a sandbox and hands element and text comments back to the conversation, with the Pi skill that writes those pages.",
+  "type": "module",
+  "keywords": ["pi-package", "pi-web.dev-plugin", "pi-web", "artifact", "review"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ivolejon/pi-web-artifact.git"
+  },
+  "piWeb": {
+    "plugins": [
+      {
+        "id": "artifact",
+        "browserRoot": ".",
+        "module": "pi-web-plugin.js"
+      }
+    ]
+  }
+}

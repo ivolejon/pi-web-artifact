@@ -1,5 +1,5 @@
 import { ArtifactPanel, reviewBus, sessionRoot } from "./review-panel.js";
-import { configureAutoOpen, watchWorkspace } from "./auto-open.js";
+import { configureAutoOpen, stopWatching, watchWorkspace } from "./auto-open.js";
 
 /**
  * The Review tab: render a review artifact from the workspace in a sandbox, let the user annotate
@@ -47,6 +47,10 @@ const plugin = {
         } catch (error) {
           stylesheetIntegration = undefined;
         }
+      },
+      dispose() {
+        // The watcher is a page-lifetime timer; the host disposes the plugin on unload or replacement.
+        stopWatching();
       },
       contributions: {
         actions: [

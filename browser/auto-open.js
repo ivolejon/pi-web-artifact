@@ -39,6 +39,13 @@ export function configureAutoOpen(pluginRuntimeId) {
   runtimePluginId = pluginRuntimeId;
 }
 
+/** The plugin's dispose hook calls this, so a reload does not leave a second watcher behind. */
+export function stopWatching() {
+  if (timer === undefined) return;
+  clearInterval(timer);
+  timer = undefined;
+}
+
 function routeScope() {
   if (typeof window === "undefined" || window.location === undefined) return undefined;
   const params = new URLSearchParams(window.location.search);

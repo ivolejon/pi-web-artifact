@@ -19,8 +19,8 @@
     "plugins": [
       {
         "id": "artifact",
-        "browserRoot": ".",
-        "module": "pi-web-plugin.js"
+        "browserRoot": "browser",
+        "module": "browser/pi-web-plugin.js"
       }
     ]
   }

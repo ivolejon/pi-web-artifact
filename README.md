@@ -90,16 +90,24 @@ from the repository under review instead of inventing them, and what the comment
 | File | Role |
 | --- | --- |
 | `package.json` | the `piWeb.plugins` entry that PI WEB discovers |
-| `pi-web-plugin.js` | contributions: the Artifact tab, its action, file-open routing |
-| `review-panel.js` | the panel element: discovery, rendering, comments, chip staging |
-| `compose.js` | builds the sandboxed document, inlines local assets, injects the annotation script |
-| `auto-open.js` | selects the tab when a new page appears for the open conversation |
+| `browser/` | the browser-public root: everything the host serves to the page |
+| `browser/pi-web-plugin.js` | contributions: the Artifact tab, its action, file-open routing |
+| `browser/review-panel.js` | the panel element: discovery, rendering, comments, chip staging |
+| `browser/compose.js` | builds the sandboxed document, inlines local assets, injects the annotation script |
+| `browser/auto-open.js` | selects the tab when a new page appears for the open conversation |
 | `skills/artifact/` | the skill, its structure sheet, template and design-token script |
+
+The package follows the plugin guide's layout. `browserRoot` is `browser`, so only that directory is
+browser-public; `package.json`, this README and the skill files are served to nobody. The entry is
+`browser/pi-web-plugin.js`, resolved from the package root, and the package has no server module, so
+installing or updating it needs a page reload and never a session-daemon restart.
 
 ## Two host contracts, not APIs
 
-`auto-open.js` relies on two things that the plugin API does not promise, and both are commented where they
-are used. Check them after a PI WEB upgrade:
+The plugin guide asks plugins to use only public entrypoints, not internal routes. `auto-open.js` cannot obey
+that and also work while its own tab is closed: a browser plugin gets no context and no navigation function
+until its panel is rendered. It therefore relies on two things the API does not promise, both commented
+where they are used. Check them after a PI WEB upgrade, and drop the module if either breaks:
 
 1. A workspace label renders in every workspace view, so its callback is where the plugin captures its
    context. That context's file handle can point at another workspace, so the listing uses the host's

@@ -110,6 +110,10 @@ are used. Check them after a PI WEB upgrade:
 If either contract changes, the tab stops opening by itself. The panel and the comments keep working, and the
 page stays one click away.
 
+## License
+
+MIT. See [LICENSE](LICENSE).
+
 ## Requirements
 
 PI WEB with browser API v5 and the `stylesheet-integration` v1 capability (verified on 1.202610.7). The plugin

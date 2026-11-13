@@ -53,6 +53,9 @@ jobs:
           path: dist/*.tgz
           if-no-files-found: error
 
+      - name: Check the packed tarball
+        run: npm publish ./dist/*.tgz --dry-run
+
       - name: Check the version is not already on npm
         run: |
           name="$(node -p "require('./package.json').name")"
@@ -70,10 +73,10 @@ jobs:
 
       - name: Publish with an npm token
         if: steps.token.outputs.present == 'true'
-        run: npm publish dist/*.tgz --access public --provenance
+        run: npm publish ./dist/*.tgz --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish with npm trusted publishing
         if: steps.token.outputs.present != 'true'
-        run: npm publish dist/*.tgz --access public --provenance
+        run: npm publish ./dist/*.tgz --access public --provenance

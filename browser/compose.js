@@ -12,6 +12,9 @@
  *    origin is added to `img-src`, which is the one deliberate hole in the policy.
  *
  * Everything remote stays blocked on purpose. An artifact is expected to be self-contained.
+ *
+ * `forPrint` produces the same document for the browser's print pipeline instead of for review: no annotation
+ * script, a print stylesheet, and a title that becomes the suggested PDF file name.
  */
 
 export const MESSAGE_SOURCE = "artifact";
@@ -148,6 +151,30 @@ function escapeStyle(text) {
   return text.replace(/<\/style/giu, "<\\/style");
 }
 
+function escapeHtml(text) {
+  return text.replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/"/gu, "&quot;");
+}
+
+/** Insert markup at the end of the head, so a print style wins over the artifact's own sheets. */
+function appendToHead(document, markup) {
+  if (/<\/head>/iu.test(document)) return document.replace(/<\/head>/iu, `${markup}\n</head>`);
+  if (/<head\b[^>]*>/iu.test(document)) return document.replace(/<head\b[^>]*>/iu, (match) => `${match}\n${markup}`);
+  return `${markup}\n${document}`;
+}
+
+/**
+ * Print rules. The page keeps its own padding as the page margin, the paper margin is zero so the artifact's
+ * background reaches the edge, and colours print as designed instead of being dropped as decoration.
+ */
+const PRINT_STYLE = `
+@page { margin: 0; }
+@media print {
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  h1, h2, h3, h4 { break-after: avoid-page; }
+  tr, img, svg, pre, blockquote, figure, table, .card, .note, .diagram { break-inside: avoid; }
+}
+`;
+
 /** Turn `./x.css` beside the artifact into a workspace-relative path, or undefined when it is not local. */
 function localPathFor(reference, directory) {
   if (typeof reference !== "string") return undefined;
@@ -181,9 +208,11 @@ function directoryOf(path) {
  * @param {string} input.html the artifact source read from disk
  * @param {string} input.path the artifact's workspace-relative path
  * @param {{ readFile: (path: string) => Promise<{ content: string }>, previewUrl?: (path: string) => string }} files
+ * @param {boolean} [input.forPrint] build the print copy rather than the review surface
+ * @param {string} [input.title] document title for the print copy, which the print dialog suggests as a name
  * @returns {Promise<{ document: string, images: string[], sheets: string[], warnings: string[] }>}
  */
-export async function composeArtifactDocument({ html, path, files }) {
+export async function composeArtifactDocument({ html, path, files, forPrint = false, title }) {
   const directory = directoryOf(path);
   const warnings = [];
   const images = [];
@@ -252,6 +281,18 @@ export async function composeArtifactDocument({ html, path, files }) {
     document = document.replace(/<head\b[^>]*>/iu, (match) => `${match}\n${policyTag}`);
   } else {
     document = `${policyTag}\n${document}`;
+  }
+
+  if (forPrint) {
+    // The print copy is only read by the print pipeline: it carries no review script and no hover styles.
+    if (typeof title === "string" && title !== "") {
+      const titleTag = `<title>${escapeHtml(title)}</title>`;
+      document = /<title\b[^>]*>[\s\S]*?<\/title>/iu.test(document)
+        ? document.replace(/<title\b[^>]*>[\s\S]*?<\/title>/iu, titleTag)
+        : appendToHead(document, titleTag);
+    }
+    document = appendToHead(document, `<style>\n${PRINT_STYLE}</style>`);
+    return { document, images, sheets, warnings };
   }
 
   const scriptTag = `<script>${escapeScript(ANNOTATION_SCRIPT)}</script>`;

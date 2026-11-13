@@ -30,6 +30,8 @@ What it does with an artifact:
 - Folds the comments column from its header, leaving a strip under the artifact that keeps the comment count.
   The fold is remembered, and a click in the artifact brings the column back, so the comment field is never
   opened off screen.
+- Saves the page as a PDF with **Save PDF**. It prints the artifact alone, without the review chrome, and the
+  print dialog's **Save as PDF** writes the file with the page's colours, fonts and selectable text.
 
 ## The binding
 

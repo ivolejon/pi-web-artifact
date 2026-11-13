@@ -21,6 +21,9 @@ those pages.
   of targets and requested changes, and you decide when to send it.
 - **It keeps up without losing your place.** A revision lands in the same tab and keeps comments, an open
   draft and scroll. Fold the comments away to see the page at full width.
+- **The chat keeps its context.** The request that creates a page is built in a tracked subsession, so the
+  code reading and the HTML writing stay out of the conversation that asked for it. The page still belongs
+  to that conversation, and the comments come back there.
 - **Nothing to operate.** It is a browser-only plugin: no server, no port, no daemon restart. The artifact runs
   in a sandbox at an opaque origin, and its policy blocks every network request.
 - **It travels.** **Save PDF** takes the page to people outside PI WEB, and deep links take the selected page
@@ -29,20 +32,25 @@ those pages.
 ## How it works
 
 ```
-Agent writes test-results/artifact/<session>/<topic>/artifact.html
+/skill:artifact delegates the build to a tracked subsession
+        │
+        ▼
+Subsession writes test-results/artifact/<parent session>/<topic>/artifact.html
         │
         ▼
 Artifact tab renders it in a sandbox, on the page's own design tokens
         │  you click an element or select text, write a comment
         ▼
-Send to chat stages one chip → the agent reads the comments and revises the page
+Send to chat stages one chip → the conversation reads the comments and revises the page
 ```
 
 ## Requirements
 
 PI WEB with browser API v5 and the `stylesheet-integration` v1 capability (verified on 1.202610.7). The plugin
 declares that capability as required, so an older host skips it instead of rendering it unstyled. The skill
-needs Node.js 18 or later for its token script and nothing else: no build step, no runtime dependencies.
+needs Node.js 18 or later for its token script and nothing else: no build step, no runtime dependencies. It
+builds the page in a tracked subsession when the host provides one (`spawnSessions` and `subsessions`, both
+on by default), and inline when it does not.
 
 ## Install
 
@@ -165,7 +173,9 @@ tables, code blocks and images across pages, and uses the page's own padding as 
 ## The skill
 
 `skills/artifact` teaches the agent to build the page: what form to choose, how to take the colours and type
-from the repository under review instead of inventing them, and what the comments come back as.
+from the repository under review instead of inventing them, and what the comments come back as. A request
+that creates a page goes to a tracked subsession, which writes into the parent conversation's
+`test-results/artifact/<session id>/` directory; the review that follows stays in the conversation.
 
 - `scripts/design-tokens.mjs` discovers the project's stylesheet, copies its custom properties and its local
   font files into `<run>/tokens.css`, and maps them onto the semantic names the structure sheet reads.

@@ -23,5 +23,11 @@
         "module": "browser/pi-web-plugin.js"
       }
     ]
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "playwright": "1.64.0"
   }
 }

@@ -4,7 +4,7 @@ A PI WEB tab that renders an agent-written page in the workspace, lets you annot
 text, and hands the comments to the conversation as a single message. It ships with the Pi skill that writes
 those pages.
 
-![The Artifact tab showing a checkout review with three comments](docs/images/artifact-tab.png)
+![The Artifact tab showing a checkout review with three comments](https://raw.githubusercontent.com/ivolejon/pi-web-artifact/main/docs/images/artifact-tab.png)
 
 *The Artifact tab on a page the agent wrote. Each comment names the element or quotes the selection, and
 **Send to chat** turns the list into one message.*
@@ -35,6 +35,12 @@ Artifact tab renders it in a sandbox, on the page's own design tokens
         ▼
 Send to chat stages one chip → the agent reads the comments and revises the page
 ```
+
+## Requirements
+
+PI WEB with browser API v5 and the `stylesheet-integration` v1 capability (verified on 1.202610.7). The plugin
+declares that capability as required, so an older host skips it instead of rendering it unstyled. The skill
+needs Node.js 18 or later for its token script and nothing else: no build step, no runtime dependencies.
 
 ## Install
 
@@ -124,7 +130,7 @@ you linked a development clone, delete that symlink.
 
 ## Folding the comments column
 
-![The comments column folded to a strip under the artifact](docs/images/comments-folded.png)
+![The comments column folded to a strip under the artifact](https://raw.githubusercontent.com/ivolejon/pi-web-artifact/main/docs/images/comments-folded.png)
 
 *Folded, the column becomes a strip that keeps the count; the artifact takes the full panel width. The choice
 survives reloads, and a click in the page reopens the column with the comment field.*
@@ -135,7 +141,7 @@ always one click away.
 
 ## Save as PDF
 
-![The second A4 page of a PDF export](docs/images/pdf-export.png)
+![The second A4 page of a PDF export](https://raw.githubusercontent.com/ivolejon/pi-web-artifact/main/docs/images/pdf-export.png)
 
 *The second page of a **Save as PDF** export. The table, the diff and the note keep their layout, and the page
 break falls between blocks rather than through one.*
@@ -194,18 +200,34 @@ where they are used. Check them after a PI WEB upgrade, and drop the module if e
 If either contract changes, the tab stops opening by itself. The panel and the comments keep working, and the
 page stays one click away.
 
-## License
+## Publishing
 
-MIT. See [LICENSE](LICENSE).
+The intended npm package name is `pi-web-artifact`, unscoped and public. The community directory lists public
+npm packages tagged `pi-web.dev-plugin`; there is no submission or registration step, so the keywords in
+`package.json` are the whole listing.
 
-## Requirements
+```bash
+npm login
+npm test
+npm publish --dry-run   # inspect the exact tarball
+npm publish             # unscoped, public by default
+```
 
-PI WEB with browser API v5 and the `stylesheet-integration` v1 capability (verified on 1.202610.7). The plugin
-declares that capability as required, so an older host skips it instead of rendering it unstyled. The skill
-needs Node.js 18 or later for its token script and nothing else: no build step, no runtime dependencies.
+`files` keeps the tarball to `browser/` and `skills/`; npm always adds `README.md`, `LICENSE` and
+`package.json`. The README images load from GitHub, so the screenshots stay out of the installed package. The
+directory also expects `pi-package`; both keywords are already declared.
 
-The tests are development-only and need Node.js 20 or later. `pi` installs git packages with production
-dependencies only, so Playwright is not installed for anyone who only uses the plugin.
+For later releases, bump the version first, then publish:
+
+```bash
+npm version patch        # or minor / major
+npm publish
+pi update npm:pi-web-artifact
+```
+
+A browser-only release needs a page reload after the update. A running Pi session needs `/reload` for the
+skill. npm search indexing can take a while before a new package or version appears in the community
+directory.
 
 ## Tests
 
@@ -223,6 +245,9 @@ the comments fold and its persistence, element and text comments, chip staging, 
 document's shape and a real PDF from it, and the stacked layout. GitHub Actions runs both suites on every
 push to `main` and every pull request.
 
+The tests need Node.js 20 or later and Playwright's Chromium. Playwright is a devDependency, and `pi` installs
+packages with production dependencies only, so people who use the plugin never install it.
+
 ## Verify a change
 
 1. Reload the browser, open a conversation that has an artifact under
@@ -238,3 +263,7 @@ push to `main` and every pull request.
    conversation you are testing in should receive the comments.
 6. Select another conversation and confirm the tab shows that conversation's state, with the previous
    conversation's comments gone. Select none and confirm the notice.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

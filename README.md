@@ -44,12 +44,14 @@ needs Node.js 18 or later for its token script and nothing else: no build step, 
 
 ## Install
 
-PI WEB discovers PI WEB plugins from installed Pi packages, so one `pi install` registers both the tab and
-`/skill:artifact`. There is no build step and no service restart.
+The tab and `/skill:artifact` ship in one npm package, so one install registers both. There is no build step
+and no service restart. The package is [`pi-web-artifact`](https://www.npmjs.com/package/pi-web-artifact).
 
 ```bash
-pi install git:github.com/ivolejon/pi-web-artifact
+pi install npm:pi-web-artifact
 ```
+
+Or open **Settings → Pi packages** in PI WEB, enter `npm:pi-web-artifact`, and install it there.
 
 Reload the browser page for the tab. A running Pi session needs `/reload`, or a new session, before the skill
 appears. Pi reads the package declaration after project trust.
@@ -63,6 +65,12 @@ pi list | grep artifact                                                      # t
 
 The host port in the example is the one this package is developed against; use your own. The package itself
 needs nothing beyond PI WEB and, for the skill, Node.js 18 or later.
+
+To follow `main` between releases, install the git source instead of the npm source:
+
+```bash
+pi install git:github.com/ivolejon/pi-web-artifact
+```
 
 ### Local development
 
@@ -80,17 +88,17 @@ On a machine where `PI_WEB_DATA_DIR` is set, link into `$PI_WEB_DATA_DIR/plugins
 ### Update
 
 ```bash
-pi update git:github.com/ivolejon/pi-web-artifact
+pi update npm:pi-web-artifact
 ```
 
-Reload the browser page for the tab. A running Pi session needs `/reload` for the updated skill. No
-session-daemon restart is needed, because the package has no server module. A symlinked development clone is
-updated with `git pull`, then a page reload.
+Or update it under **Settings → Pi packages**. Reload the browser page for the tab. A running Pi session
+needs `/reload` for the updated skill. No session-daemon restart is needed, because the package has no server
+module. A symlinked development clone is updated with `git pull`, then a page reload.
 
 ### Remove
 
 ```bash
-pi remove git:github.com/ivolejon/pi-web-artifact
+pi remove npm:pi-web-artifact
 ```
 
 Reload the browser page. Settings → PI WEB plugins can also disable the tab without removing the package. If
@@ -205,31 +213,17 @@ page stays one click away.
 
 Publishing runs in GitHub Actions: `.github/workflows/publish.yml` tests, packs one tarball, uploads it as the
 `pi-web-artifact` Actions artifact, and publishes that exact file on a published GitHub Release, with
-provenance. The intended package name is `pi-web-artifact`, unscoped and public, and the community directory
-finds it through the `pi-web.dev-plugin` keyword. Treat any `npm publish` on a workstation as a bootstrap or
-an emergency, not the normal release path.
+provenance. The package is published on npm as `pi-web-artifact`, unscoped and public, and the community
+directory finds it through the `pi-web.dev-plugin` keyword. Treat any `npm publish` on a workstation as a
+bootstrap or an emergency, not the normal release path.
 
-### First publish
+### Bootstrap
 
-npm trusted publishing is configured on an existing package, so the first version needs either a one-time
-token or a manual publish.
-
-**With a token, so the first release also runs in the pipeline.** Create a granular npm token with read and
-write access to packages. If the account requires two-factor authentication for publishing, enable **Bypass
-two-factor authentication (2FA)** on the token; without it npm returns `E403` and the pipeline cannot answer an
-OTP prompt. A classic **Automation** token works too. Add the token as the repository secret `NPM_TOKEN`, then
-create the `v0.1.0` release. The workflow uses the token and records provenance. Delete the secret after
-trusted publishing works.
-
-**Without a token, one manual publish.** From a checkout at the version:
-
-```bash
-npm login
-npm test
-npm publish --access public
-```
-
-Then continue with trusted publishing and the next version.
+The first version, `0.1.0`, was published from the pipeline with a short-lived granular token that had 2FA
+bypass enabled, because npm trusted publishing is configured on an existing package. That is the one-time cost
+of a new package: publish `0.1.0` with a bootstrap token or manually, then configure trusted publishing and
+release the next version through OIDC. Keep the bootstrap token short-lived, and remove it once the OIDC
+publish works.
 
 ### Trusted publishing
 
@@ -254,7 +248,7 @@ gh release create "v$(node -p "require('./package.json').version")" --generate-n
 
 The release must carry exactly `v<package.json version>`; the workflow refuses a mismatch. It also refuses a
 version that is already on npm. A manual **Run workflow** on the Publish workflow skips the tag check, for a
-retry or the first token publish. The published tarball is also kept as an Actions artifact for the run.
+retry. The published tarball is also kept as an Actions artifact for the run.
 
 After the run, check `npm view pi-web-artifact version` and the provenance badge on npm. Installs update with:
 

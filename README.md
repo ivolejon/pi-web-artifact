@@ -1,5 +1,7 @@
 # Artifact
 
+[![npm version](https://img.shields.io/npm/v/pi-web-artifact)](https://www.npmjs.com/package/pi-web-artifact)
+
 A PI WEB tab that renders an agent-written page in the workspace, lets you annotate elements and selected
 text, and hands the comments to the conversation as a single message. It ships with the Pi skill that writes
 those pages.

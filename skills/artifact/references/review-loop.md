@@ -38,7 +38,9 @@ What it does with an artifact:
 A workspace holds many conversations, and each can have its own page. The session id in the path is what
 keeps them apart:
 
-- The agent writes to `test-results/artifact/$PI_SESSION_ID/<topic>/artifact.html`.
+- The agent writes to `test-results/artifact/<session id>/<topic>/artifact.html`. The request that creates
+the page is delegated to a tracked subsession, which writes under the parent conversation's id from its
+brief, so the page still belongs to the conversation that asked for it.
 - The tab lists only the selected conversation's directory, so a page written here cannot be reviewed in
   another conversation.
 - **Send to chat** stages the comments for that same conversation. Comments and the open comment field are kept per

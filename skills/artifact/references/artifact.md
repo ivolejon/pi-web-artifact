@@ -11,7 +11,7 @@ font files into `<run>/tokens.css`, and maps them onto the semantic names `artif
 
 ```bash
 node "$SKILL_DIR/scripts/design-tokens.mjs" \
-  --out "test-results/artifact/$PI_SESSION_ID/<topic>/tokens.css" --json
+  --out "test-results/artifact/<session id>/<topic>/tokens.css" --json
 ```
 
 - Without `--css` it discovers: `style.css`, `styles.css`, `globals.css`, `theme.css`, `tokens.css` and
@@ -58,18 +58,22 @@ Three files in the run directory: `artifact.html`, `artifact.css` copied from th
 `tokens.css`.
 
 ```bash
-mkdir -p "test-results/artifact/$PI_SESSION_ID/<topic>"
+mkdir -p "test-results/artifact/<session id>/<topic>"
 cp "$SKILL_DIR/assets/artifact.css" "$SKILL_DIR/assets/artifact-template.html" \
-   "test-results/artifact/$PI_SESSION_ID/<topic>/"
-mv "test-results/artifact/$PI_SESSION_ID/<topic>/artifact-template.html" \
-   "test-results/artifact/$PI_SESSION_ID/<topic>/artifact.html"
+   "test-results/artifact/<session id>/<topic>/"
+mv "test-results/artifact/<session id>/<topic>/artifact-template.html" \
+   "test-results/artifact/<session id>/<topic>/artifact.html"
 node "$SKILL_DIR/scripts/design-tokens.mjs" \
-   --out "test-results/artifact/$PI_SESSION_ID/<topic>/tokens.css" --json
+   --out "test-results/artifact/<session id>/<topic>/tokens.css" --json
 ```
 
 The session id segment is not decoration. The Artifact tab is a workspace panel, and several conversations
 share one workspace, so the tab lists only `test-results/artifact/<session id>/` and the comments return to
 that conversation. Write the page anywhere else and the tab will not show it.
+
+The id is the conversation the page belongs to. When you build inline that is `$PI_SESSION_ID`; when the
+build is delegated, your own `PI_SESSION_ID` belongs to the subsession and is the wrong one, so use the
+parent conversation's id from the brief.
 
 `test-results/` is ignored by git, so an artifact is a working surface, not a deliverable. Put it somewhere
 else only when the user asks to keep the page, and then say that it will be committed, keeping the same

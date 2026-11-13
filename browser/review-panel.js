@@ -211,6 +211,8 @@ export class ArtifactPanel extends HTMLElement {
   #draft;
   #annotate = true;
   #commentsCollapsed = false;
+  #preparingPdf = false;
+  #printFrame;
   #status = "idle";
   #message = "";
   #warnings = [];
@@ -271,8 +273,17 @@ export class ArtifactPanel extends HTMLElement {
     send.textContent = "Send to chat";
     send.addEventListener("click", () => this.#send());
 
+    const pdf = document.createElement("button");
+    pdf.type = "button";
+    pdf.className = "ui-button ui-button--compact";
+    pdf.textContent = "Save PDF";
+    pdf.title = "Print the artifact, or choose Save as PDF in the print dialog";
+    pdf.addEventListener("click", () => {
+      void this.#savePdf();
+    });
 
-    bar.append(tabs, refresh, lineBreak, annotateButton, spacer, send);
+
+    bar.append(tabs, refresh, lineBreak, annotateButton, spacer, pdf, send);
 
     const info = document.createElement("p");
     info.className = "info";
@@ -370,7 +381,7 @@ export class ArtifactPanel extends HTMLElement {
     shadow.append(style, wrap);
 
     this.#dom = {
-      tabs, refresh, annotateButton, send, info, warn, stage, asideHead, asideCount,
+      tabs, refresh, annotateButton, send, pdf, info, warn, stage, asideHead, asideCount,
       iframe, notice, noticeTitle, noticeBody, draft, target, textarea, list, hint,
     };
 
@@ -435,6 +446,7 @@ export class ArtifactPanel extends HTMLElement {
   disconnectedCallback() {
     window.removeEventListener("message", this.#onMessage);
     reviewBus.removeEventListener("invalidate", this.#onInvalidate);
+    this.#removePrintFrame();
     this.#stopWatching();
   }
 
@@ -856,6 +868,104 @@ export class ArtifactPanel extends HTMLElement {
     );
   }
 
+  /**
+   * The PDF is the artifact alone, through the browser's own print pipeline, so it keeps the design, the
+   * fonts and selectable text. The browser has no API that writes a PDF file directly: the print dialog's
+   * **Save as PDF** is the download step, and the document title becomes its suggested file name.
+   */
+  async #savePdf() {
+    const path = this.#selectedPath;
+    const files = this.#files();
+    if (this.#status !== "ready" || this.#preparingPdf || path === undefined || files === undefined) return;
+    const title = this.#pdfTitle();
+    this.#preparingPdf = true;
+    this.#renderChrome();
+    try {
+      const file = await files.readFile(path);
+      const composed = await composeArtifactDocument({
+        html: file.content,
+        path,
+        files,
+        forPrint: true,
+        title,
+      });
+      // A compose takes a few awaits. If the page changed meanwhile, the click belongs to the old page.
+      if (path !== this.#selectedPath) return;
+      this.#print(composed.document);
+      this.#message = "The print dialog opens. Choose Save as PDF.";
+    } catch (error) {
+      this.#message = `The PDF could not be prepared: ${String(error?.message ?? error)}`;
+    } finally {
+      this.#preparingPdf = false;
+      this.#renderChrome();
+    }
+  }
+
+  /** The topic is enough for a file name unless it holds several pages. */
+  #pdfTitle() {
+    const artifact = this.#selected();
+    if (artifact === undefined) return undefined;
+    const pages = this.#artifacts.filter((candidate) => candidate.slug === artifact.slug).length;
+    if (pages <= 1) return artifact.slug;
+    const short = artifact.name.replace(/\.html?$/iu, "").replace(/^artifact[-.]?/u, "") || "artifact";
+    return `${artifact.slug} - ${short}`;
+  }
+
+  /**
+   * Print from a same-origin frame rather than the review surface. The frame runs no scripts and allows only
+   * modals, so `print()` is permitted without giving the artifact back its reach into the host.
+   */
+  #print(documentText) {
+    this.#removePrintFrame();
+    const frame = document.createElement("iframe");
+    frame.setAttribute("sandbox", "allow-same-origin allow-modals");
+    frame.setAttribute("aria-hidden", "true");
+    frame.setAttribute("title", "Artifact print view");
+    frame.style.cssText =
+      "position: fixed; top: 0; left: 0; width: 794px; height: 1123px; border: 0; opacity: 0; pointer-events: none;";
+    frame.addEventListener("load", () => {
+      void this.#runPrint(frame);
+    }, { once: true });
+    frame.srcdoc = documentText;
+    this.#printFrame = frame;
+    this.shadowRoot.append(frame);
+  }
+
+  #removePrintFrame() {
+    this.#printFrame?.remove();
+    this.#printFrame = undefined;
+  }
+
+  async #runPrint(frame) {
+    const win = frame.contentWindow;
+    const doc = frame.contentDocument;
+    if (win === null || doc === null) {
+      this.#removePrintFrame();
+      return;
+    }
+    // Print only once the page is what it will be on paper, not while fonts and images are still arriving.
+    try {
+      await doc.fonts?.ready;
+    } catch (error) {
+      /* A browser without the Font Loading API prints with whatever has loaded. */
+    }
+    await Promise.all([...(doc.images ?? [])].map((image) => image.decode().catch(() => {})));
+    if (this.#printFrame !== frame) return;
+    const cleanup = () => {
+      if (this.#printFrame === frame) this.#removePrintFrame();
+      else frame.remove();
+    };
+    win.addEventListener("afterprint", cleanup, { once: true });
+    try {
+      win.focus();
+      win.print();
+    } catch (error) {
+      cleanup();
+      this.#message = "The browser did not open a print dialog.";
+      this.#renderChrome();
+    }
+  }
+
   #renderChrome() {
     const dom = this.#dom;
     if (dom.tabs === undefined) return;
@@ -908,6 +1018,7 @@ export class ArtifactPanel extends HTMLElement {
     dom.asideCount.title = `${this.#comments.length} ${this.#comments.length === 1 ? "comment" : "comments"}`;
     this.#renderCollapsed();
     dom.send.disabled = this.#comments.length === 0 || this.#selectedPath === undefined;
+    dom.pdf.disabled = this.#status !== "ready" || this.#preparingPdf;
     dom.refresh.disabled = this.#status === "loading";
 
     dom.warn.hidden = this.#warnings.length === 0;

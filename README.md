@@ -73,6 +73,11 @@ without removing the package. To remove the skill, `pi remove -l <source>`.
 - **Sends to the chat.** **Send to chat** stages the comments as a chip in the message box (`setChip`), or
   writes them into the box when the host has no chip support. You press **Send**; the plugin never posts a
   message on its own.
+- **Saves the page as a PDF.** **Save PDF** prints the artifact alone through the browser's print pipeline, so
+  the file keeps the page's own colours, fonts and selectable text, without the toolbar or the comments. The
+  browser has no API that writes a PDF directly, so the print dialog's **Save as PDF** is the download step;
+  the suggested file name is the topic. The print stylesheet keeps colours, avoids splitting cards and code
+  blocks, and lets the page's own padding be the page margin.
 - **Deep links.** The panel stores the selected page in the tab's query, and a chat or Files link to a file
   under the open conversation's directory opens in this tab. A link to another conversation's artifact opens
   in Files instead.
@@ -97,7 +102,7 @@ from the repository under review instead of inventing them, and what the comment
 | `browser/` | the browser-public root: everything the host serves to the page |
 | `browser/pi-web-plugin.js` | contributions: the Artifact tab, its action, file-open routing |
 | `browser/review-panel.js` | the panel element: discovery, rendering, comments, chip staging |
-| `browser/compose.js` | builds the sandboxed document, inlines local assets, injects the annotation script |
+| `browser/compose.js` | builds the sandboxed document, inlines local assets, injects the annotation script, and builds the print copy |
 | `browser/auto-open.js` | selects the tab when a new page appears for the open conversation |
 | `skills/artifact/` | the skill, its structure sheet, template and design-token script |
 
@@ -141,7 +146,9 @@ needs Node.js 18 or later for its token script and nothing else: no build step, 
    that the strip keeps the comment count and that a reload keeps it folded.
 3. Click a heading and a paragraph: both comments must name a selector, and the text comment must quote the
    selection.
-4. Press **Send to chat** and confirm the chip appears in the message box. Do not press Send unless the
+4. Press **Save PDF**, choose **Save as PDF** in the print dialog, and open the file: the page appears alone,
+   with its colours and selectable text, and a card or code block is not cut across pages.
+5. Press **Send to chat** and confirm the chip appears in the message box. Do not press Send unless the
    conversation you are testing in should receive the comments.
-5. Select another conversation and confirm the tab shows that conversation's state, with the previous
+6. Select another conversation and confirm the tab shows that conversation's state, with the previous
    conversation's comments gone. Select none and confirm the notice.

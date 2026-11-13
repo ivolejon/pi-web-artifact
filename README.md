@@ -105,6 +105,8 @@ from the repository under review instead of inventing them, and what the comment
 | `browser/compose.js` | builds the sandboxed document, inlines local assets, injects the annotation script, and builds the print copy |
 | `browser/auto-open.js` | selects the tab when a new page appears for the open conversation |
 | `skills/artifact/` | the skill, its structure sheet, template and design-token script |
+| `test/` | unit tests for the composer and browser tests for the panel, with their harness |
+| `.github/workflows/test.yml` | runs the suite on every push to `main` and every pull request |
 
 The package follows the plugin guide's layout. `browserRoot` is `browser`, so only that directory is
 browser-public; `package.json`, this README and the skill files are served to nobody. The entry is
@@ -135,7 +137,26 @@ MIT. See [LICENSE](LICENSE).
 
 PI WEB with browser API v5 and the `stylesheet-integration` v1 capability (verified on 1.202610.7). The plugin
 declares that capability as required, so an older host skips it instead of rendering it unstyled. The skill
-needs Node.js 18 or later for its token script and nothing else: no build step, no dependencies.
+needs Node.js 18 or later for its token script and nothing else: no build step, no runtime dependencies.
+
+The tests are development-only and need Node.js 20 or later. `pi` installs git packages with production
+dependencies only, so Playwright is not installed for anyone who only uses the plugin.
+
+## Tests
+
+```bash
+npm install
+npx playwright install chromium   # once per machine; --with-deps on Linux CI
+npm test
+```
+
+`test/compose.test.js` covers the composer without a browser: stylesheet inlining and escaping, missing and
+remote sheets, image preview URLs and the policy, the annotation script, the print copy and its title, and the
+comment text. `test/panel.browser.test.js` mounts the real `<artifact-panel>` against an in-memory workspace in
+`test/support/harness.html`: tab order and selection, discovery and session binding, stylesheet rendering,
+the comments fold and its persistence, element and text comments, chip staging, draft restoration, the print
+document's shape and a real PDF from it, and the stacked layout. GitHub Actions runs both suites on every
+push to `main` and every pull request.
 
 ## Verify a change
 

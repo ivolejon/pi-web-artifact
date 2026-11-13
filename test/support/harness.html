@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Artifact panel harness</title>
+    <!--
+      Mounts the real ArtifactPanel against an in-memory workspace. The test server serves the repository
+      root, so the module below is the same file the package ships. Query parameters:
+        width    fixed panel width in pixels; omit for the whole viewport
+        session  session id to bind to, or "none" to open without a conversation
+    -->
+    <style>
+      :root {
+        --pi-bg: #fbfaf7;
+        --pi-surface: #ffffff;
+        --pi-surface-hover: #f1efe9;
+        --pi-border: #ddd8cf;
+        --pi-muted: #6b655c;
+        --pi-accent: #c2410c;
+        --pi-danger: #b3261e;
+        --pi-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #e8e4dc;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        display: flex;
+        align-items: stretch;
+        justify-content: flex-start;
+      }
+      #host {
+        height: 100vh;
+        width: 100%;
+        min-width: 0;
+        background: var(--pi-bg);
+      }
+      artifact-panel {
+        display: block;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="host"></div>
+    <script type="module">
+      import { ArtifactPanel } from "/browser/review-panel.js";
+
+      if (customElements.get("artifact-panel") === undefined) {
+        customElements.define("artifact-panel", ArtifactPanel);
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const width = Number(params.get("width") ?? "");
+      if (Number.isFinite(width) && width > 0) {
+        document.getElementById("host").style.width = `${width}px`;
+      }
+      const sessionId = params.get("session") ?? "session-1";
+
+      const htmlA = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Topic A</title>
+<link rel="stylesheet" href="./artifact.css"></head>
+<body><main><h1>Topic A artifact</h1><p class="lede">Rendered through the panel.</p>
+<ul><li>First question</li></ul></main></body></html>`;
+      const htmlB = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Topic B</title>
+<style>body { margin: 0; padding: 24px; font-family: system-ui, sans-serif; }</style></head>
+<body><main><h1>Topic B artifact</h1><p class="lede">The newest page in this conversation.</p>
+<ul><li>Second question</li></ul></main></body></html>`;
+      const htmlOther = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Other</title></head>
+<body><main><h1>Session two artifact</h1><p>Only this conversation sees it.</p></main></body></html>`;
+
+      const sources = {
+        "test-results/artifact/session-1/topic-a/artifact.html": {
+          content: htmlA,
+          modifiedAt: "2026-01-01T10:00:00.000Z",
+        },
+        "test-results/artifact/session-1/topic-a/artifact.css": {
+          content: "body { --harness-topic: a; } .lede { color: #555555; }",
+        },
+        "test-results/artifact/session-1/topic-b/artifact.html": {
+          content: htmlB,
+          modifiedAt: "2026-01-02T10:00:00.000Z",
+        },
+        "test-results/artifact/session-2/other/artifact.html": {
+          content: htmlOther,
+          modifiedAt: "2026-01-03T10:00:00.000Z",
+        },
+      };
+
+      const directory = (name, path) => ({ type: "directory", name, path });
+      const file = (name, path, modifiedAt) => ({
+        type: "file",
+        name,
+        path,
+        modifiedAt,
+        size: sources[path]?.content.length ?? 0,
+      });
+      const listings = {
+        "test-results/artifact": {
+          entries: [
+            directory("session-1", "test-results/artifact/session-1"),
+            directory("session-2", "test-results/artifact/session-2"),
+          ],
+        },
+        "test-results/artifact/session-1": {
+          entries: [
+            directory("topic-a", "test-results/artifact/session-1/topic-a"),
+            directory("topic-b", "test-results/artifact/session-1/topic-b"),
+          ],
+        },
+        "test-results/artifact/session-1/topic-a": {
+          entries: [
+            file(
+              "artifact.html",
+              "test-results/artifact/session-1/topic-a/artifact.html",
+              sources["test-results/artifact/session-1/topic-a/artifact.html"].modifiedAt,
+            ),
+          ],
+        },
+        "test-results/artifact/session-1/topic-b": {
+          entries: [
+            file(
+              "artifact.html",
+              "test-results/artifact/session-1/topic-b/artifact.html",
+              sources["test-results/artifact/session-1/topic-b/artifact.html"].modifiedAt,
+            ),
+          ],
+        },
+        "test-results/artifact/session-2": {
+          entries: [directory("other", "test-results/artifact/session-2/other")],
+        },
+        "test-results/artifact/session-2/other": {
+          entries: [
+            file(
+              "artifact.html",
+              "test-results/artifact/session-2/other/artifact.html",
+              sources["test-results/artifact/session-2/other/artifact.html"].modifiedAt,
+            ),
+          ],
+        },
+      };
+
+      const files = {
+        async listFiles(path) {
+          const listing = listings[path];
+          if (listing === undefined) throw new Error(`No such directory: ${path}`);
+          return { entries: listing.entries };
+        },
+        async readFile(path) {
+          const source = sources[path];
+          if (source === undefined) throw new Error(`No such file: ${path}`);
+          return {
+            content: source.content,
+            modifiedAt: source.modifiedAt,
+            size: source.content.length,
+          };
+        },
+        previewUrl: (path) => `/api/preview?path=${encodeURIComponent(path)}`,
+      };
+
+      const context = {
+        workspace: { id: "workspace-1" },
+        state: sessionId === "none" ? { selectedSession: undefined } : { selectedSession: { id: sessionId } },
+        navigation: {
+          query: {},
+          set(key, value, options) {
+            window.__navigation = { key, value, options };
+          },
+        },
+        files,
+        prompt: {
+          getText: () => "",
+          insertText: (text) => {
+            window.__inserted = text;
+          },
+          setChip: (chip) => {
+            window.__chip = chip;
+          },
+        },
+      };
+
+      const panel = document.createElement("artifact-panel");
+      panel.context = context;
+      document.getElementById("host").append(panel);
+
+      window.__panel = panel;
+      window.__context = context;
+      window.__sessionId = sessionId;
+    </script>
+  </body>
+</html>

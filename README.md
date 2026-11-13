@@ -4,6 +4,28 @@ A PI WEB tab that renders an agent-written page in the workspace, lets you annot
 text, and hands the comments to the conversation as a single message. It ships with the Pi skill that writes
 those pages.
 
+![The Artifact tab showing a checkout review with three comments](docs/images/artifact-tab.png)
+
+*The Artifact tab on a page the agent wrote. Each comment names the element or quotes the selection, and
+**Send to chat** turns the list into one message.*
+
+## Why it is good
+
+- **The comment knows what it points at.** Every comment carries the target's tag and CSS selector, or the
+  text it quotes, so the agent revises the thing you saw instead of a description of it.
+- **The page uses the product's design.** The skill reads the repository's own colours, type and radii into
+  the page, so a review of a checkout screen looks like the checkout, not like a generic report.
+- **Review is one message, not a thread.** Comments are staged as one chip; the agent receives a numbered list
+  of targets and requested changes, and you decide when to send it.
+- **It keeps up without losing your place.** A revision lands in the same tab and keeps comments, an open
+  draft and scroll. Fold the comments away to see the page at full width.
+- **Nothing to operate.** It is a browser-only plugin: no server, no port, no daemon restart. The artifact runs
+  in a sandbox at an opaque origin, and its policy blocks every network request.
+- **It travels.** **Save PDF** takes the page to people outside PI WEB, and deep links take the selected page
+  to the ones inside.
+
+## How it works
+
 ```
 Agent writes test-results/artifact/<session>/<topic>/artifact.html
         │
@@ -16,20 +38,15 @@ Send to chat stages one chip → the agent reads the comments and revises the pa
 
 ## Install
 
-Two registrations, because the two runtimes look in different places. Neither needs a service restart.
+PI WEB discovers PI WEB plugins from installed Pi packages, so one `pi install` registers both the tab and
+`/skill:artifact`. There is no build step and no service restart.
 
 ```bash
-# 1. PI WEB: the tab. Clone anywhere, then link it into the local plugin directory.
-git clone https://github.com/ivolejon/pi-web-artifact.git
-ln -sfn "$(pwd)/pi-web-artifact" ~/.pi-web/plugins/artifact
-
-# 2. Pi: the /skill:artifact command.
-pi install -l git:github.com/ivolejon/pi-web-artifact   # or a local path: pi install -l ./pi-web-artifact
+pi install git:github.com/ivolejon/pi-web-artifact
 ```
 
-Reload the browser page for the tab. Pi reads the package declaration after project trust, and a running
-session needs `/reload` to pick the skill up. On a machine where `PI_WEB_DATA_DIR` is set, link into
-`$PI_WEB_DATA_DIR/plugins` instead.
+Reload the browser page for the tab. A running Pi session needs `/reload`, or a new session, before the skill
+appears. Pi reads the package declaration after project trust.
 
 Check both:
 
@@ -38,8 +55,40 @@ curl -s http://127.0.0.1:8504/api/plugins | grep -o '"id":"artifact"[^}]*'   # t
 pi list | grep artifact                                                      # the skill
 ```
 
-To remove the tab, delete the symlink and reload the browser; Settings → PI WEB plugins can also disable it
-without removing the package. To remove the skill, `pi remove -l <source>`.
+The host port in the example is the one this package is developed against; use your own. The package itself
+needs nothing beyond PI WEB and, for the skill, Node.js 18 or later.
+
+### Local development
+
+Clone the repository, link it as a local PI WEB plugin, and install the local package for the skill. The
+local plugin wins over the package copy, so edits under `browser/` show up on the next page reload.
+
+```bash
+git clone https://github.com/ivolejon/pi-web-artifact.git
+ln -sfn "$(pwd)/pi-web-artifact" ~/.pi-web/plugins/artifact
+pi install -l ./pi-web-artifact
+```
+
+On a machine where `PI_WEB_DATA_DIR` is set, link into `$PI_WEB_DATA_DIR/plugins` instead.
+
+### Update
+
+```bash
+pi update git:github.com/ivolejon/pi-web-artifact
+```
+
+Reload the browser page for the tab. A running Pi session needs `/reload` for the updated skill. No
+session-daemon restart is needed, because the package has no server module. A symlinked development clone is
+updated with `git pull`, then a page reload.
+
+### Remove
+
+```bash
+pi remove git:github.com/ivolejon/pi-web-artifact
+```
+
+Reload the browser page. Settings → PI WEB plugins can also disable the tab without removing the package. If
+you linked a development clone, delete that symlink.
 
 ## What it does
 
@@ -66,21 +115,36 @@ without removing the package. To remove the skill, `pi remove -l <source>`.
   Press **Enter** to add the comment. **Show** scrolls the artifact back to it, **Remove** deletes it.
   Comments are kept in `sessionStorage` per conversation and page, because the host unmounts the panel
   whenever another tab is selected.
-- **Folds the comments column away.** The column's header is its toggle: folded, the column and its comments
-  become a strip under the artifact that keeps the comment count and expands again. The choice is remembered
-  across pages, conversations and reloads, and a click in the artifact brings the column back, so a comment
-  field is never opened off screen.
 - **Sends to the chat.** **Send to chat** stages the comments as a chip in the message box (`setChip`), or
   writes them into the box when the host has no chip support. You press **Send**; the plugin never posts a
   message on its own.
-- **Saves the page as a PDF.** **Save PDF** prints the artifact alone through the browser's print pipeline, so
-  the file keeps the page's own colours, fonts and selectable text, without the toolbar or the comments. The
-  browser has no API that writes a PDF directly, so the print dialog's **Save as PDF** is the download step;
-  the suggested file name is the topic. The print stylesheet keeps colours, avoids splitting cards and code
-  blocks, and lets the page's own padding be the page margin.
 - **Deep links.** The panel stores the selected page in the tab's query, and a chat or Files link to a file
   under the open conversation's directory opens in this tab. A link to another conversation's artifact opens
   in Files instead.
+
+## Folding the comments column
+
+![The comments column folded to a strip under the artifact](docs/images/comments-folded.png)
+
+*Folded, the column becomes a strip that keeps the count; the artifact takes the full panel width. The choice
+survives reloads, and a click in the page reopens the column with the comment field.*
+
+The column's header is the toggle. It works in both layouts: beside the artifact on a wide panel, below it
+when the panel is narrow. The strip keeps the comment count even when nothing is open, so the column is
+always one click away.
+
+## Save as PDF
+
+![The second A4 page of a PDF export](docs/images/pdf-export.png)
+
+*The second page of a **Save as PDF** export. The table, the diff and the note keep their layout, and the page
+break falls between blocks rather than through one.*
+
+**Save PDF** prints the artifact alone through the browser's own print pipeline, so the file keeps the page's
+colours, fonts and selectable text and contains none of the review chrome. The browser has no API that writes
+a PDF directly, so the print dialog's **Save as PDF** is the download step, and the suggested file name is the
+topic. The print stylesheet keeps the background, switches entrance animations off, avoids splitting cards,
+tables, code blocks and images across pages, and uses the page's own padding as the page margin.
 
 ## The skill
 
@@ -105,6 +169,7 @@ from the repository under review instead of inventing them, and what the comment
 | `browser/compose.js` | builds the sandboxed document, inlines local assets, injects the annotation script, and builds the print copy |
 | `browser/auto-open.js` | selects the tab when a new page appears for the open conversation |
 | `skills/artifact/` | the skill, its structure sheet, template and design-token script |
+| `docs/images/` | the screenshots used by this README |
 | `test/` | unit tests for the composer and browser tests for the panel, with their harness |
 | `.github/workflows/test.yml` | runs the suite on every push to `main` and every pull request |
 

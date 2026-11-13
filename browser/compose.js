@@ -164,12 +164,15 @@ function appendToHead(document, markup) {
 
 /**
  * Print rules. The page keeps its own padding as the page margin, the paper margin is zero so the artifact's
- * background reaches the edge, and colours print as designed instead of being dropped as decoration.
+ * background reaches the edge, and colours print as designed instead of being dropped as decoration. Entrance
+ * animations are switched off: the print copy is fresh, so an animated section could otherwise print at its
+ * first, invisible frame.
  */
 const PRINT_STYLE = `
 @page { margin: 0; }
 @media print {
   html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  * { animation: none !important; transition: none !important; }
   h1, h2, h3, h4 { break-after: avoid-page; }
   tr, img, svg, pre, blockquote, figure, table, .card, .note, .diagram { break-inside: avoid; }
 }

@@ -118,6 +118,7 @@ test("the print document has no review script, keeps the print rules and takes t
   assert.doesNotMatch(document, /<script>/u);
   assert.match(document, /@page \{ margin: 0; \}/u);
   assert.match(document, /print-color-adjust: exact/u);
+  assert.match(document, /animation: none !important/u);
   assert.match(document, /<title>Topic A<\/title>/u);
   assert.doesNotMatch(document, /<title>Original<\/title>/u);
 });

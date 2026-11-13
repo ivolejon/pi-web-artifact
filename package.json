@@ -1,6 +1,6 @@
 {
   "name": "pi-web-artifact",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A PI WEB tab that renders an agent-written page from the workspace in a sandbox and hands element and text comments back to the conversation, with the Pi skill that writes those pages.",
   "license": "MIT",
   "type": "module",

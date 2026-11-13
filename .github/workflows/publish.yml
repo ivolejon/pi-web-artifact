@@ -43,7 +43,9 @@ jobs:
       - run: npm test
 
       - name: Pack the npm tarball
-        run: npm pack --pack-destination dist
+        run: |
+          mkdir -p dist
+          npm pack --pack-destination dist
 
       - uses: actions/upload-artifact@v7
         with:

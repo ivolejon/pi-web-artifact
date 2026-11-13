@@ -1,0 +1,77 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # npm trusted publishing and provenance mint a short-lived OIDC token.
+  id-token: write
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Check the release tag matches package.json
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          if [ "$version" != "$RELEASE_TAG" ]; then
+            echo "::error::package.json is at $version, but the release is $RELEASE_TAG"
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+
+      - name: Pack the npm tarball
+        run: npm pack --pack-destination dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pi-web-artifact
+          path: dist/*.tgz
+          if-no-files-found: error
+
+      - name: Check the version is not already on npm
+        run: |
+          name="$(node -p "require('./package.json').name")"
+          version="$(node -p "require('./package.json').version")"
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "::error::$name@$version is already published"
+            exit 1
+          fi
+
+      # The token is only read as a boolean here. The secret itself is exposed only to the publish step
+      # that needs it, so the tests and the pack step never see it.
+      - name: Detect an npm access token
+        id: token
+        run: echo "present=${{ secrets.NPM_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish with an npm token
+        if: steps.token.outputs.present == 'true'
+        run: npm publish dist/*.tgz --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish with npm trusted publishing
+        if: steps.token.outputs.present != 'true'
+        run: npm publish dist/*.tgz --access public --provenance

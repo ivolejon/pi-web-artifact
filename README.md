@@ -66,6 +66,10 @@ without removing the package. To remove the skill, `pi remove -l <source>`.
   Press **Enter** to add the comment. **Show** scrolls the artifact back to it, **Remove** deletes it.
   Comments are kept in `sessionStorage` per conversation and page, because the host unmounts the panel
   whenever another tab is selected.
+- **Folds the comments column away.** The column's header is its toggle: folded, the column and its comments
+  become a strip under the artifact that keeps the comment count and expands again. The choice is remembered
+  across pages, conversations and reloads, and a click in the artifact brings the column back, so a comment
+  field is never opened off screen.
 - **Sends to the chat.** **Send to chat** stages the comments as a chip in the message box (`setChip`), or
   writes them into the box when the host has no chip support. You press **Send**; the plugin never posts a
   message on its own.
@@ -133,7 +137,8 @@ needs Node.js 18 or later for its token script and nothing else: no build step, 
 1. Reload the browser, open a conversation that has an artifact under
    `test-results/artifact/<that session id>/`, and open the Artifact tab.
 2. Confirm the page renders with the project's own colours and fonts and no console errors, and that it fills
-   the panel; narrow the window until the comments column moves below the frame.
+   the panel; narrow the window until the comments column moves below the frame. Fold the column and check
+   that the strip keeps the comment count and that a reload keeps it folded.
 3. Click a heading and a paragraph: both comments must name a selector, and the text comment must quote the
    selection.
 4. Press **Send to chat** and confirm the chip appears in the message box. Do not press Send unless the

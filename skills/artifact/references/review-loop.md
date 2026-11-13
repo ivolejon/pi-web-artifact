@@ -27,6 +27,9 @@ What it does with an artifact:
   from a terminal does not always reach the plugin as a host invalidation.
 - Selects itself when a new page appears for the open conversation, which is why the skill stays silent. A
   revision of a page that already exists does not move the tab.
+- Folds the comments column from its header, leaving a strip under the artifact that keeps the comment count.
+  The fold is remembered, and a click in the artifact brings the column back, so the comment field is never
+  opened off screen.
 
 ## The binding
 

@@ -15,6 +15,12 @@ export const reviewBus = new EventTarget();
 
 const HTML_FILE = /\.html?$/iu;
 
+/** Remembers whether the comments column is folded away, across pages, conversations and reloads. */
+const COLLAPSED_KEY = "artifact:comments-collapsed:v1";
+
+/** Points right when the column is expanded beside the artifact, down when it is stacked, up when folded. */
+const CHEVRON = `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg>`;
+
 function isComment(value) {
   return (
     typeof value === "object" &&
@@ -22,6 +28,18 @@ function isComment(value) {
     typeof value.comment === "string" &&
     typeof value.selector === "string" &&
     typeof value.tag === "string" &&
+    (value.kind === "element" || value.kind === "text")
+  );
+}
+
+/** An open comment field: the target is chosen, the text is not written yet, so there is no `comment`. */
+function isDraft(value) {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof value.selector === "string" &&
+    typeof value.tag === "string" &&
+    typeof value.excerpt === "string" &&
     (value.kind === "element" || value.kind === "text")
   );
 }
@@ -114,14 +132,30 @@ const STYLE = `
   .bar-break { flex-basis: 100%; height: 0; }
   .bar .spacer { flex: 1 1 auto; }
   .annotate-toggle[aria-pressed="true"] { background: var(--pi-surface-hover); box-shadow: inset 0 0 0 1px var(--pi-accent); }
-  .stage { display: grid; grid-template-columns: minmax(0, 1fr) 340px; flex: 1 1 auto; min-height: 0; }
+  .stage { display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: minmax(0, 1fr); flex: 1 1 auto; min-height: 0; }
   .frame-holder { position: relative; min-width: 0; min-height: 0; background: #ffffff; }
   iframe { display: block; width: 100%; height: 100%; border: 0; background: #ffffff; }
   .notice { position: absolute; inset: 0; display: none; place-content: center; padding: 32px; text-align: center; background: var(--pi-bg); }
   .notice[data-visible="true"] { display: grid; }
   .notice h2 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
   .notice p { margin: 0; max-width: 52ch; color: var(--pi-muted); font-size: 13px; line-height: 1.5; }
-  aside { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--pi-border); }
+  aside { display: flex; flex-direction: column; grid-column: 2; grid-row: 1; min-height: 0; border-left: 1px solid var(--pi-border); }
+  /* Folded away, the column becomes a strip under the artifact: the header stays, the body goes, so the
+   * control moves to the foot of the artifact instead of vanishing with the column. */
+  .stage[data-collapsed="true"] { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .stage[data-collapsed="true"] aside { grid-column: 1; grid-row: 2; border-left: 0; border-top: 1px solid var(--pi-border); }
+  .aside-head { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 38px; padding: 0 10px 0 12px; border: 0; border-bottom: 1px solid var(--pi-border); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .stage[data-collapsed="true"] .aside-head { border-bottom: 0; }
+  .aside-head:hover { background: var(--pi-surface-hover); }
+  .aside-head:focus-visible { outline: 2px solid var(--pi-accent); outline-offset: -2px; }
+  .aside-head .label { font-size: 12px; font-weight: 600; }
+  .aside-head .count { display: inline-grid; min-width: 18px; height: 18px; place-items: center; border-radius: 999px; background: var(--pi-accent); color: var(--pi-bg); padding: 0 5px; font-size: 10px; font-weight: 600; }
+  .aside-head .count[hidden] { display: none; }
+  .aside-head .chevron { display: grid; place-items: center; margin-left: auto; color: var(--pi-muted); transition: transform 120ms ease; }
+  .aside-head:hover .chevron { color: inherit; }
+  .stage[data-collapsed="true"] .aside-head .chevron { transform: rotate(-90deg); }
+  .aside-body { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
+  .stage[data-collapsed="true"] .aside-body { display: none; }
   .draft { display: grid; gap: 8px; padding: 12px; border-bottom: 1px solid var(--pi-border); }
   .draft[hidden] { display: none; }
   .draft .target { margin: 0; font-family: var(--pi-mono); font-size: 11px; color: var(--pi-muted); overflow-wrap: anywhere; }
@@ -156,7 +190,11 @@ const STYLE = `
      * it sits in, and a capped row would leave the panel with dead space when there is one comment. */
     .stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
     .comments { max-height: 42cqh; }
-    aside { border-left: 0; border-top: 1px solid var(--pi-border); }
+    aside { grid-column: 1; grid-row: 2; border-left: 0; border-top: 1px solid var(--pi-border); }
+    /* Stacked, the column lives below the artifact, so the fold points down. The folded strip is below
+     * the artifact in both layouts, so its chevron keeps pointing up. */
+    .aside-head .chevron { transform: rotate(90deg); }
+    .stage[data-collapsed="true"] .aside-head .chevron { transform: rotate(-90deg); }
   }
 `;
 
@@ -172,6 +210,7 @@ export class ArtifactPanel extends HTMLElement {
   #comments = [];
   #draft;
   #annotate = true;
+  #commentsCollapsed = false;
   #status = "idle";
   #message = "";
   #warnings = [];
@@ -226,10 +265,6 @@ export class ArtifactPanel extends HTMLElement {
     const spacer = document.createElement("span");
     spacer.className = "spacer";
 
-    const count = document.createElement("span");
-    count.style.fontSize = "12px";
-    count.style.color = "var(--pi-muted)";
-
     const send = document.createElement("button");
     send.type = "button";
     send.className = "ui-button ui-button--compact ui-button--primary primary";
@@ -237,7 +272,7 @@ export class ArtifactPanel extends HTMLElement {
     send.addEventListener("click", () => this.#send());
 
 
-    bar.append(tabs, refresh, lineBreak, annotateButton, spacer, count, send);
+    bar.append(tabs, refresh, lineBreak, annotateButton, spacer, send);
 
     const info = document.createElement("p");
     info.className = "info";
@@ -264,6 +299,22 @@ export class ArtifactPanel extends HTMLElement {
     holder.append(iframe, notice);
 
     const aside = document.createElement("aside");
+
+    const asideHead = document.createElement("button");
+    asideHead.type = "button";
+    asideHead.className = "aside-head";
+    asideHead.setAttribute("aria-controls", "artifact-comments");
+    const asideLabel = document.createElement("span");
+    asideLabel.className = "label";
+    asideLabel.textContent = "Comments";
+    const asideCount = document.createElement("span");
+    asideCount.className = "count";
+    asideCount.hidden = true;
+    const chevron = document.createElement("span");
+    chevron.className = "chevron";
+    chevron.innerHTML = CHEVRON;
+    asideHead.append(asideLabel, asideCount, chevron);
+    asideHead.addEventListener("click", () => this.#setCollapsed(!this.#commentsCollapsed));
 
     const draft = document.createElement("form");
     draft.className = "draft";
@@ -309,16 +360,21 @@ export class ArtifactPanel extends HTMLElement {
     const hint = document.createElement("p");
     hint.className = "hint";
 
-    aside.append(draft, list, hint);
+    const asideBody = document.createElement("div");
+    asideBody.className = "aside-body";
+    asideBody.id = "artifact-comments";
+    asideBody.append(draft, list, hint);
+    aside.append(asideHead, asideBody);
     stage.append(holder, aside);
     wrap.append(bar, info, warn, stage);
     shadow.append(style, wrap);
 
     this.#dom = {
-      tabs, refresh, annotateButton, count, send, info, warn,
+      tabs, refresh, annotateButton, send, info, warn, stage, asideHead, asideCount,
       iframe, notice, noticeTitle, noticeBody, draft, target, textarea, list, hint,
     };
 
+    this.#commentsCollapsed = this.#readCollapsed();
     window.addEventListener("message", this.#onMessage);
     reviewBus.addEventListener("invalidate", this.#onInvalidate);
     this.#renderChrome();
@@ -502,12 +558,14 @@ export class ArtifactPanel extends HTMLElement {
     // Payloads written before the rename stored the list under `notes`.
     const stored = Array.isArray(parsed?.comments) ? parsed.comments : Array.isArray(parsed?.notes) ? parsed.notes : [];
     this.#comments = stored.filter(isComment);
-    const draft = isComment(parsed?.draft) ? parsed.draft : undefined;
+    const draft = isDraft(parsed?.draft) ? parsed.draft : undefined;
     const draftText = typeof parsed?.draftText === "string" ? parsed.draftText : "";
     if (draft === undefined) {
       this.#dom.draft.hidden = true;
     } else {
       this.#draft = draft;
+      // A restored draft is a comment field in progress; never leave it folded out of sight.
+      if (this.#commentsCollapsed) this.#setCollapsed(false);
       this.#dom.draft.hidden = false;
       this.#dom.target.textContent = describeTarget(draft);
       this.#dom.textarea.value = draftText;
@@ -645,6 +703,43 @@ export class ArtifactPanel extends HTMLElement {
     this.#postMode();
   }
 
+  /**
+   * The fold is a preference, not page state: it is kept in localStorage so it survives a reload, another
+   * artifact and another conversation. The host unmounts the panel on a tab switch, which is why it cannot
+   * live in the element alone.
+   */
+  #readCollapsed() {
+    try {
+      return window.localStorage.getItem(COLLAPSED_KEY) === "true";
+    } catch (error) {
+      return false;
+    }
+  }
+
+  #persistCollapsed() {
+    try {
+      window.localStorage.setItem(COLLAPSED_KEY, this.#commentsCollapsed ? "true" : "false");
+    } catch (error) {
+      /* A full or blocked storage leaves the fold for this page only. */
+    }
+  }
+
+  #setCollapsed(value) {
+    const collapsed = value === true;
+    if (collapsed === this.#commentsCollapsed) return;
+    this.#commentsCollapsed = collapsed;
+    this.#persistCollapsed();
+    this.#renderCollapsed();
+  }
+
+  #renderCollapsed() {
+    const dom = this.#dom;
+    if (dom.asideHead === undefined) return;
+    dom.stage.dataset.collapsed = this.#commentsCollapsed ? "true" : "false";
+    dom.asideHead.setAttribute("aria-expanded", this.#commentsCollapsed ? "false" : "true");
+    dom.asideHead.title = this.#commentsCollapsed ? "Show the comments" : "Hide the comments";
+  }
+
   #postMode() {
     const frame = this.#dom.iframe;
     if (frame.contentWindow === null) return;
@@ -675,6 +770,8 @@ export class ArtifactPanel extends HTMLElement {
       excerpt,
       link: typeof data.link === "string" ? data.link.slice(0, 200) : undefined,
     };
+    // A pick lands in the comment field, so the field has to be on screen even when the column was folded.
+    if (this.#commentsCollapsed) this.#setCollapsed(false);
     const draft = this.#dom.draft;
     draft.hidden = false;
     this.#dom.target.textContent = describeTarget(this.#draft);
@@ -806,9 +903,10 @@ export class ArtifactPanel extends HTMLElement {
     dom.annotateButton.title = this.#annotate
       ? "Annotating: click an element or select text to write a comment"
       : "Browsing: clicks stay inside the page. Turn this on to annotate";
-    dom.count.textContent = this.#comments.length === 0
-      ? ""
-      : `${this.#comments.length} ${this.#comments.length === 1 ? "comment" : "comments"}`;
+    dom.asideCount.hidden = this.#comments.length === 0;
+    dom.asideCount.textContent = String(this.#comments.length);
+    dom.asideCount.title = `${this.#comments.length} ${this.#comments.length === 1 ? "comment" : "comments"}`;
+    this.#renderCollapsed();
     dom.send.disabled = this.#comments.length === 0 || this.#selectedPath === undefined;
     dom.refresh.disabled = this.#status === "loading";
 

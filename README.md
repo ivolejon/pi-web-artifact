@@ -215,8 +215,11 @@ npm trusted publishing is configured on an existing package, so the first versio
 token or a manual publish.
 
 **With a token, so the first release also runs in the pipeline.** Create a granular npm token with read and
-write access to packages, add it as the repository secret `NPM_TOKEN`, then create the `v0.1.0` release. The
-workflow uses the token and records provenance. Delete the secret after trusted publishing works.
+write access to packages. If the account requires two-factor authentication for publishing, enable **Bypass
+two-factor authentication (2FA)** on the token; without it npm returns `E403` and the pipeline cannot answer an
+OTP prompt. A classic **Automation** token works too. Add the token as the repository secret `NPM_TOKEN`, then
+create the `v0.1.0` release. The workflow uses the token and records provenance. Delete the secret after
+trusted publishing works.
 
 **Without a token, one manual publish.** From a checkout at the version:
 

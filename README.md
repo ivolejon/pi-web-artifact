@@ -178,6 +178,7 @@ from the repository under review instead of inventing them, and what the comment
 | `docs/images/` | the screenshots used by this README |
 | `test/` | unit tests for the composer and browser tests for the panel, with their harness |
 | `.github/workflows/test.yml` | runs the suite on every push to `main` and every pull request |
+| `.github/workflows/publish.yml` | tests and publishes a GitHub Release to npm, with provenance |
 
 The package follows the plugin guide's layout. `browserRoot` is `browser`, so only that directory is
 browser-public; `package.json`, this README and the skill files are served to nobody. The entry is
@@ -202,32 +203,64 @@ page stays one click away.
 
 ## Publishing
 
-The intended npm package name is `pi-web-artifact`, unscoped and public. The community directory lists public
-npm packages tagged `pi-web.dev-plugin`; there is no submission or registration step, so the keywords in
-`package.json` are the whole listing.
+Publishing runs in GitHub Actions: `.github/workflows/publish.yml` tests, packs one tarball, uploads it as the
+`pi-web-artifact` Actions artifact, and publishes that exact file on a published GitHub Release, with
+provenance. The intended package name is `pi-web-artifact`, unscoped and public, and the community directory
+finds it through the `pi-web.dev-plugin` keyword. Treat any `npm publish` on a workstation as a bootstrap or
+an emergency, not the normal release path.
+
+### First publish
+
+npm trusted publishing is configured on an existing package, so the first version needs either a one-time
+token or a manual publish.
+
+**With a token, so the first release also runs in the pipeline.** Create a granular npm token with read and
+write access to packages, add it as the repository secret `NPM_TOKEN`, then create the `v0.1.0` release. The
+workflow uses the token and records provenance. Delete the secret after trusted publishing works.
+
+**Without a token, one manual publish.** From a checkout at the version:
 
 ```bash
 npm login
 npm test
-npm publish --dry-run   # inspect the exact tarball
-npm publish             # unscoped, public by default
+npm publish --access public
 ```
 
-`files` keeps the tarball to `browser/` and `skills/`; npm always adds `README.md`, `LICENSE` and
-`package.json`. The README images load from GitHub, so the screenshots stay out of the installed package. The
-directory also expects `pi-package`; both keywords are already declared.
+Then continue with trusted publishing and the next version.
 
-For later releases, bump the version first, then publish:
+### Trusted publishing
+
+1. On npmjs.com, open the package's **Settings → Trusted publishing** and add a GitHub Actions publisher.
+2. Enter organization or user `ivolejon`, repository `pi-web-artifact`, workflow filename `publish.yml`, and
+   leave the environment empty.
+3. Allow **npm publish**. The workflow also asks for `id-token: write`, which it already declares.
+4. Publish a new version within two days, or the new configuration expires and has to be created again. After
+   the token bootstrap, bump to `0.1.1` and release that version to validate the configuration.
+
+Once the OIDC publish succeeds, remove the `NPM_TOKEN` secret. The workflow detects the missing secret and
+switches to trusted publishing automatically. Restricting token access under **Settings → Publishing access**
+afterwards is recommended.
+
+### Release a version
 
 ```bash
-npm version patch        # or minor / major
-npm publish
+npm version patch        # or minor / major; commits the bump and creates the vX.Y.Z tag
+git push --follow-tags
+gh release create "v$(node -p "require('./package.json').version")" --generate-notes
+```
+
+The release must carry exactly `v<package.json version>`; the workflow refuses a mismatch. It also refuses a
+version that is already on npm. A manual **Run workflow** on the Publish workflow skips the tag check, for a
+retry or the first token publish. The published tarball is also kept as an Actions artifact for the run.
+
+After the run, check `npm view pi-web-artifact version` and the provenance badge on npm. Installs update with:
+
+```bash
 pi update npm:pi-web-artifact
 ```
 
-A browser-only release needs a page reload after the update. A running Pi session needs `/reload` for the
-skill. npm search indexing can take a while before a new package or version appears in the community
-directory.
+A browser-only release needs a page reload; a running Pi session needs `/reload` for the skill. npm search
+indexing can take a while before a new package or version appears in the community directory.
 
 ## Tests
 
